@@ -1,0 +1,21 @@
+FROM vllm-glm52-cuda130:full
+# DSpark GLM-5.2 on the January-proven GLM image: PRs #46995+#47093 (3-way, zero conflicts)
+# + draft KV-dtype decouple shim.
+COPY overlay023/ /usr/local/lib/python3.12/dist-packages/vllm/
+RUN python3 - <<'GATE'
+import importlib, inspect
+for m in ["vllm.v1.worker.gpu.spec_decode.dspark.speculator",
+          "vllm.v1.worker.gpu.spec_decode.dspark.utils",
+          "vllm.model_executor.models.qwen3_dspark",
+          "vllm.transformers_utils.configs.speculators.algos",
+          "vllm.v1.attention.backends.mla.sparse_swa",
+          "vllm.v1.worker.gpu.model_runner",
+          "vllm.v1.core.sched.scheduler"]:
+    importlib.import_module(m); print("import OK:", m)
+from vllm.config.speculative import SpeculativeConfig
+s = inspect.getsource(SpeculativeConfig); assert "dspark" in s and "Qwen3DSparkModel" in s
+from vllm.model_executor.models.registry import ModelRegistry
+assert "Qwen3DSparkModel" in ModelRegistry.get_supported_archs()
+import os; assert os.path.exists("/usr/local/cuda-13.0/targets/sbsa-linux/lib/libcudart.so.13"), "launcher LD_PRELOAD path missing"
+print("023-DSPARK GATE OK")
+GATE
