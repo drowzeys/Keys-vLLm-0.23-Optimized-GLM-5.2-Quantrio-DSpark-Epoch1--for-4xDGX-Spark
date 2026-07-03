@@ -6,6 +6,25 @@ stack (PRs [#46995](https://github.com/vllm-project/vllm/pull/46995) +
 [`GLM-5.2-speculator.dspark`](https://huggingface.co/RedHatAI/GLM-5.2-speculator.dspark)
 draft on consumer Blackwell (sm_121a) — ~24 hours after the PRs merged upstream.**
 
+## ⭐ STANDING CONFIG — MTP k=3 + NVFP4-KV + 64K ctx + 6 streams (2026-07-03)
+
+| Metric | Result |
+|---|---|
+| **C6 aggregate** | **38.0 tok/s** |
+| C4 aggregate | 28.4 tok/s |
+| Single-stream | 14.1–15.0 tok/s |
+| Context | 65,536 (KV pool 81,920 tokens, `nvfp4_ds_mla` @ 33KiB/tok) |
+| Acceptance (MTP k=3) | 2.33 accepted length, 44% draft efficiency |
+| Image | `vllm-glm52-cuda130:dspark-nvfp4` (serves MTP **and** DSpark via one env switch) |
+
+```bash
+IMG=vllm-glm52-cuda130:dspark-nvfp4 MTPK=3 KVD=nvfp4_ds_mla CTX=65536 SEQS=6 \
+UTIL=0.86 BTOK=2048 EXTRA='--num-gpu-blocks-override 1280' ./recipe/launch-cluster.sh
+```
+
+Best-known GLM-5.2 numbers on a 4×GB10 cluster. DSpark (below) re-contests the crown
+when draft acceptance on the quantized target improves (epoch-2/3 or QuantTrio retrain).
+
 Target: `QuantTrio/GLM-5.2-Int4-Int8Mix` (full, non-pruned 4-bit-expert / 8-bit-attention
 quant — the only GLM-5.2 that fits 4×128GB unified memory), TP=4 over 200G RoCE.
 
