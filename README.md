@@ -6,24 +6,25 @@ stack (PRs [#46995](https://github.com/vllm-project/vllm/pull/46995) +
 [`GLM-5.2-speculator.dspark`](https://huggingface.co/RedHatAI/GLM-5.2-speculator.dspark)
 draft on consumer Blackwell (sm_121a) — ~24 hours after the PRs merged upstream.**
 
-## ⭐ STANDING CONFIG — MTP k=3 + NVFP4-KV + 64K ctx + 6 streams (2026-07-03)
+## ⭐ STANDING CONFIG — MTP k=3 + NVFP4-KV · **100K context** · 12 streams (2026-07-03)
 
-| Metric | Result |
-|---|---|
-| **C6 aggregate** | **38.0 tok/s** |
-| C4 aggregate | 28.4 tok/s |
-| Single-stream | 14.1–15.0 tok/s |
-| Context | 65,536 (KV pool 81,920 tokens, `nvfp4_ds_mla` @ 33KiB/tok) |
-| Acceptance (MTP k=3) | 2.33 accepted length, 44% draft efficiency |
-| Image | `vllm-glm52-cuda130:dspark-nvfp4` (serves MTP **and** DSpark via one env switch) |
+| C1 | C2 | C4 | C6 | C8 | **C12** |
+|---|---|---|---|---|---|
+| 13.9–14.3 | 21.1 | 28.3 | 37.7 | 41.8 | **49.2 tok/s** |
+
+- **Context 98,304** (KV pool 102,400 tokens, `nvfp4_ds_mla` @ 33KiB/tok), gpu-mem-util **0.85** (strict OOM-safe budget)
+- MTP k=3 acceptance **holds under C12 load**: 2.40 accepted length, 47% draft efficiency
+- **Churn-correctness: 12/12 exact** (staggered, mixed-length, greedy) — upstream's paged-KV-group
+  drafter design absorbs the Keys Patch-1 semantics (stable req slotting); no corruption through C12
+- Image `vllm-glm52-cuda130:dspark-nvfp4` — flips to DSpark draft with one env var
 
 ```bash
-IMG=vllm-glm52-cuda130:dspark-nvfp4 MTPK=3 KVD=nvfp4_ds_mla CTX=65536 SEQS=6 \
-UTIL=0.86 BTOK=2048 EXTRA='--num-gpu-blocks-override 1280' ./recipe/launch-cluster.sh
+IMG=vllm-glm52-cuda130:dspark-nvfp4 MTPK=3 KVD=nvfp4_ds_mla CTX=98304 SEQS=12 \
+UTIL=0.85 BTOK=2048 EXTRA='--num-gpu-blocks-override 1600' ./recipe/launch-cluster.sh
 ```
 
-Best-known GLM-5.2 numbers on a 4×GB10 cluster. DSpark (below) re-contests the crown
-when draft acceptance on the quantized target improves (epoch-2/3 or QuantTrio retrain).
+Best-known GLM-5.2 numbers on a 4×GB10 cluster. DSpark (below) re-contests when draft
+acceptance on the quantized target improves (epoch-2/3 or QuantTrio-native retrain).
 
 Target: `QuantTrio/GLM-5.2-Int4-Int8Mix` (full, non-pruned 4-bit-expert / 8-bit-attention
 quant — the only GLM-5.2 that fits 4×128GB unified memory), TP=4 over 200G RoCE.
